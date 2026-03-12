@@ -359,17 +359,56 @@ public class AgentResourceManager extends UserResourceManager {
         try {
             JSONObject rawPayload = new JSONObject(scimObjectString);
             boolean isUserServingAgent = false;
+            String agentType = null;
+            String callbackUrl = null;
+            Long cibaAuthReqExpiryTime = null;
+            String notificationChannels = null;
+
             if (rawPayload.has(SCIMConstants.AGENT_SCHEMA_URI)) {
                 JSONObject agentExtension = rawPayload.getJSONObject(SCIMConstants.AGENT_SCHEMA_URI);
+
+                // Extract IsUserServingAgent flag
                 if (agentExtension.has("IsUserServingAgent")) {
                     isUserServingAgent = agentExtension.getBoolean("IsUserServingAgent");
+                    LOG.debug("Extracted IsUserServingAgent: {}", isUserServingAgent);
+                }
+
+                // Extract AgentType (SYNCHRONOUS or ASYNCHRONOUS)
+                if (agentExtension.has("AgentType")) {
+                    agentType = agentExtension.getString("AgentType");
+                    LOG.debug("Extracted AgentType: {}", agentType);
+                }
+
+                // Extract CallbackUrl for synchronous agents
+                if (agentExtension.has("CallbackUrl")) {
+                    callbackUrl = agentExtension.getString("CallbackUrl");
+                    LOG.debug("Extracted CallbackUrl: {}", callbackUrl);
+                }
+
+                // Extract CibaAuthReqExpiryTime for asynchronous agents
+                if (agentExtension.has("CibaAuthReqExpiryTime")) {
+                    cibaAuthReqExpiryTime = agentExtension.getLong("CibaAuthReqExpiryTime");
+                    LOG.debug("Extracted CibaAuthReqExpiryTime: {} seconds", cibaAuthReqExpiryTime);
+                }
+
+                // Extract NotificationChannels (comma-separated string) for asynchronous agents
+                if (agentExtension.has("NotificationChannels")) {
+                    notificationChannels = agentExtension.getString("NotificationChannels");
+                    LOG.debug("Extracted NotificationChannels: {}", notificationChannels);
                 }
             }
 
+            // Set all extracted values to ThreadLocal for use by UserApplicationCreationListener
             IdentityUtil.threadLocalProperties.get().put("isUserServingAgent", isUserServingAgent);
+            IdentityUtil.threadLocalProperties.get().put("agentType", agentType);
+            IdentityUtil.threadLocalProperties.get().put("callbackUrl", callbackUrl);
+            IdentityUtil.threadLocalProperties.get().put("cibaAuthReqExpiryTime", cibaAuthReqExpiryTime);
+            IdentityUtil.threadLocalProperties.get().put("notificationChannels", notificationChannels);
+
+            LOG.debug("Successfully set agent properties to ThreadLocal for agent creation");
         } catch (JSONException error) {
-            LOG.error("Failed to extract IsUserServingAgent flag, defaulting to false: {}", error.getMessage());
-            IdentityUtil.threadLocalProperties.get().put("isUserServingAgent",false);
+            LOG.error("Failed to extract agent properties from SCIM payload: {}", error.getMessage());
+            IdentityUtil.threadLocalProperties.get().put("isUserServingAgent", false);
         }
     }
 }
